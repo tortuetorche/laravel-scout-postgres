@@ -43,7 +43,7 @@ class PostgresEngine extends Engine
     /**
      * @var \Closure
      */
-    protected $queryClosure;
+    protected $queryCallback;
 
     /**
      * Create a new instance of PostgresEngine.
@@ -218,7 +218,7 @@ class PostgresEngine extends Engine
      */
     public function extendQuery(Closure $closure)
     {
-        $this->queryClosure = $closure;
+        $this->queryCallback = $closure;
     }
 
     /**
@@ -286,8 +286,8 @@ class PostgresEngine extends Engine
         $query->crossJoin($this->database->raw($tsQuery->sql().' AS "tsquery"'));
         $query->addBinding($tsQuery->bindings(), 'join');
 
-        if ($this->queryClosure instanceof Closure) {
-            $this->queryClosure->call($this, $query);
+        if ($this->queryCallback instanceof Closure) {
+            $this->queryCallback->call($this, $query);
         }
 
         return $this->database
