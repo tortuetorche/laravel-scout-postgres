@@ -213,12 +213,12 @@ class PostgresEngine extends Engine
     /**
      * "Extend" the SQL search query.
      *
-     * @param  \Closure  $closure
+     * @param  \Closure  $callback
      * @return void
      */
-    public function extendQuery(Closure $closure)
+    public function extendQuery($callback = null)
     {
-        $this->queryCallback = $closure;
+        $this->queryCallback = $callback;
     }
 
     /**
