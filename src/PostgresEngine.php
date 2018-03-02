@@ -239,9 +239,8 @@ class PostgresEngine extends Engine
         $indexColumn = $this->getIndexColumn($builder->model);
 
         // Build the SQL query
-        $query = $this->database
-            ->table($builder->index ?: $builder->model->searchableAs())
-            ->select($builder->model->getKeyName())
+        $query = $builder->index ? $this->database->table($builder->index) : $builder->model->query();
+        $query->select($builder->model->getQualifiedKeyName())
             ->selectRaw("{$this->rankingExpression($builder->model, $indexColumn)} AS rank")
             ->selectRaw('COUNT(*) OVER () AS total_count')
             ->whereRaw("$indexColumn @@ \"tsquery\"");
@@ -290,8 +289,7 @@ class PostgresEngine extends Engine
             $this->queryCallback->call($this, $query);
         }
 
-        return $this->database
-            ->select($query->toSql(), $query->getBindings());
+        return $query->get();
     }
 
     /**
