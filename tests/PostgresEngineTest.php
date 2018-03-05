@@ -302,8 +302,6 @@ $eloquentBuilder = Mockery::mock(EloquentBuilder::class)->makePartial();
 
 class TestModel extends Model
 {
-    public $id = 1;
-
     public $searchableOptions = [
         'rank' => [
             'fields' => [
@@ -329,9 +327,9 @@ class TestModel extends Model
         return 'id';
     }
 
-    public function getKey()
+    public function getIdAttribute($value)
     {
-        return $this->id;
+        return $value ?: 1;
     }
 
     public function getTable()
