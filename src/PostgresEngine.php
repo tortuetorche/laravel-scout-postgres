@@ -7,6 +7,7 @@ use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as IlluminateCollection;
 use ScoutEngines\Postgres\TsQuery\ToTsQuery;
 use ScoutEngines\Postgres\TsQuery\PlainToTsQuery;
 use ScoutEngines\Postgres\TsQuery\PhraseToTsQuery;
@@ -202,7 +203,9 @@ class PostgresEngine extends Engine
      */
     public function getTotalCount($results)
     {
-        if (empty($results)) {
+        if (empty($results) ||
+            ($results instanceof IlluminateCollection && $results->isEmpty())
+        ) {
             return 0;
         }
 
@@ -224,10 +227,10 @@ class PostgresEngine extends Engine
     /**
      * Perform the given search on the engine.
      *
-     * @param \Laravel\Scout\Builder $builder
-     * @param int|null $perPage
-     * @param int $page
-     * @return array
+     * @param  \Laravel\Scout\Builder $builder
+     * @param  int|null $perPage
+     * @param  int $page
+     * @return \Illuminate\Support\Collection|Illuminate\Database\Eloquent\Collection
      */
     protected function performSearch(Builder $builder, $perPage = 0, $page = 1)
     {
@@ -336,7 +339,9 @@ class PostgresEngine extends Engine
      */
     public function map($results, $model)
     {
-        if (empty($results)) {
+        if (empty($results) ||
+            ($results instanceof IlluminateCollection && $results->isEmpty())
+        ) {
             return Collection::make();
         }
 
