@@ -263,7 +263,9 @@ class PostgresEngine extends Engine
 
         // Apply order by clauses that were set on the builder instance if any
         foreach ($builder->orders as $order) {
-            $query->orderBy($order['column'], $order['direction']);
+            if ($order['column']) {
+                $query->orderBy($order['column'], $order['direction']);
+            }
         }
 
         // Apply default order by clauses (rank and id)
