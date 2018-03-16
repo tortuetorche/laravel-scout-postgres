@@ -89,7 +89,7 @@ class PostgresEngine extends Engine
 
         $query = $this->database
             ->table($model->searchableAs())
-            ->where($model->getKeyName(), '=', $model->getKey());
+            ->where($model->getQualifiedKeyName(), '=', $model->getKey());
 
         if (method_exists($model, 'searchableAdditionalArray')) {
             $data = $data->merge($model->searchableAdditionalArray() ?: []);
@@ -161,13 +161,14 @@ class PostgresEngine extends Engine
         }
 
         $indexColumn = $this->getIndexColumn($model);
+        $qualifiedKey = $model->getQualifiedKeyName();
         $key = $model->getKeyName();
 
         $ids = $models->pluck($key)->all();
 
         $this->database
             ->table($model->searchableAs())
-            ->whereIn($key, $ids)
+            ->whereIn($qualifiedKey, $ids)
             ->update([$indexColumn => null]);
     }
 
@@ -351,7 +352,7 @@ class PostgresEngine extends Engine
 
         $results = collect($results);
 
-        $models = $model->whereIn($model->getKeyName(), $keys->all())
+        $models = $model->whereIn($model->getQualifiedKeyName(), $keys->all())
             ->get()
             ->keyBy($model->getKeyName());
 

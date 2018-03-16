@@ -40,7 +40,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('where')
-            ->with('id', '=', 1)
+            ->with('table.id', '=', 1)
             ->andReturnSelf();
 
         $table->shouldReceive('update')
@@ -63,7 +63,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('whereIn')
-            ->with('id', [1])
+            ->with('table.id', [1])
             ->andReturnSelf();
         $table->shouldReceive('update')
             ->with(['searchable' => null]);
@@ -78,7 +78,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('whereIn')
-            ->with('id', [1])
+            ->with('table.id', [1])
             ->andReturnSelf();
         $table->shouldReceive('update')
             ->with(['searchable' => null]);
@@ -184,8 +184,9 @@ class PostgresEngineTest extends TestCase
         list($engine) = $this->getEngine();
 
         $model = Mockery::mock('StdClass');
+        $model->shouldReceive('getQualifiedKeyName')->andReturn('table.id');
         $model->shouldReceive('getKeyName')->andReturn('id');
-        $model->shouldReceive('whereIn')->once()->with('id', [1])->andReturn($model);
+        $model->shouldReceive('whereIn')->once()->with('table.id', [1])->andReturn($model);
         $model->shouldReceive('get')->once()->andReturn(Collection::make([new TestModel()]));
 
         $results = $engine->map(
@@ -199,8 +200,9 @@ class PostgresEngineTest extends TestCase
         list($engine) = $this->getEngine();
 
         $model = Mockery::mock('StdClass');
+        $model->shouldReceive('getQualifiedKeyName')->andReturn('table.id');
         $model->shouldReceive('getKeyName')->andReturn('id');
-        $model->shouldReceive('whereIn')->once()->with('id', [1, 2])->andReturn($model);
+        $model->shouldReceive('whereIn')->once()->with('table.id', [1, 2])->andReturn($model);
 
         $expectedModel = new SoftDeletableTestModel();
         $expectedModel->id = 2;
@@ -288,7 +290,7 @@ class PostgresEngineTest extends TestCase
                     ->with('rank', 'desc')
                     ->andReturnSelf()
                 ->shouldReceive('orderBy')
-                    ->with('id')
+                    ->with('table.id')
                     ->andReturnSelf();
         }
 
@@ -320,6 +322,11 @@ class TestModel extends Model
     public function searchableAs()
     {
         return 'searchable';
+    }
+
+    public function getQualifiedKeyName()
+    {
+        return 'table.id';
     }
 
     public function getKeyName()
