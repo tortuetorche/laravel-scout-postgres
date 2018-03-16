@@ -271,7 +271,7 @@ class PostgresEngine extends Engine
         // Apply default order by clauses (rank and id)
         if (empty($builder->orders)) {
             $query->orderBy('rank', 'desc')
-                ->orderBy($builder->model->getKeyName());
+                ->orderBy($builder->model->getQualifiedKeyName());
         }
 
         if ($perPage > 0) {
