@@ -171,7 +171,7 @@ class PostgresEngineTest extends TestCase
         $table->shouldReceive('skip')->with(0)->andReturnSelf()
             ->shouldReceive('limit')->with(5)->andReturnSelf()
             ->shouldReceive('where')->with('bar', 1)->andReturnSelf()
-            ->shouldReceive('whereNull')->with('deleted_at');
+            ->shouldReceive('whereNull')->with('table.deleted_at');
 
         $builder = new Builder(new SoftDeletableTestModel(), 'foo');
         $builder->where('bar', 1)->take(5);
