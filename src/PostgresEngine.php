@@ -258,7 +258,7 @@ class PostgresEngine extends Engine
         if (! $this->isExternalIndex($builder->model)) {
             // and the model uses soft deletes we need to exclude trashed rows
             if ($this->usesSoftDeletes($builder->model)) {
-                $query->whereNull($builder->model->getDeletedAtColumn());
+                $query->whereNull($builder->model->getQualifiedDeletedAtColumn());
             }
         }
 
