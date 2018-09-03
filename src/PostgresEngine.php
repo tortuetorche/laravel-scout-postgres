@@ -285,10 +285,11 @@ class PostgresEngine extends Engine
         // file or individually for each model in searchableOptions()
         // See https://www.postgresql.org/docs/current/static/textsearch-controls.html
         $tsQuery = $builder->callback
-            ? call_user_func($builder->callback, $builder, $this->searchConfig($builder->model))
+            ? call_user_func($builder->callback, $builder, $this->searchConfig($builder->model), $query)
             : $this->defaultQueryMethod($builder->query, $this->searchConfig($builder->model));
 
         $query->crossJoin($this->database->raw($tsQuery->sql().' AS "tsquery"'));
+        // Add TS bindings to the query
         $query->addBinding($tsQuery->bindings(), 'join');
 
         if ($this->queryCallback instanceof Closure) {
@@ -336,11 +337,12 @@ class PostgresEngine extends Engine
     /**
      * Map the given results to instances of the given model.
      *
-     * @param  mixed $results
-     * @param  \Illuminate\Database\Eloquent\Model $model
-     * @return \Illuminate\Support\Collection
+     * @param  \Laravel\Scout\Builder  $builder
+     * @param  mixed  $results
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function map($results, $model)
+    public function map(Builder $builder, $results, $model)
     {
         if (empty($results) ||
             ($results instanceof IlluminateCollection && $results->isEmpty())
