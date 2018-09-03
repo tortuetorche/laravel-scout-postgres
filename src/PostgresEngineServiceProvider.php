@@ -46,5 +46,13 @@ class PostgresEngineServiceProvider extends ServiceProvider
                 return $this;
             });
         }
+
+        if (! Builder::hasMacro('extendQuery')) {
+            Builder::macro('extendQuery', function ($callback = null) {
+                $this->model->searchableUsing()->extendQuery($callback);
+
+                return $this;
+            });
+        }
     }
 }

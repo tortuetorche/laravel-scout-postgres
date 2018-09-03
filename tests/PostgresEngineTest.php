@@ -10,6 +10,7 @@ use ScoutEngines\Postgres\PostgresEngine;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 class PostgresEngineTest extends TestCase
 {
@@ -39,7 +40,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('where')
-            ->with('id', '=', 1)
+            ->with('table.id', '=', 1)
             ->andReturnSelf();
 
         $table->shouldReceive('update')
@@ -62,7 +63,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('whereIn')
-            ->with('id', [1])
+            ->with('table.id', [1])
             ->andReturnSelf();
         $table->shouldReceive('update')
             ->with(['searchable' => null]);
@@ -77,7 +78,7 @@ class PostgresEngineTest extends TestCase
         $db->shouldReceive('table')
             ->andReturn($table = Mockery::mock('stdClass'));
         $table->shouldReceive('whereIn')
-            ->with('id', [1])
+            ->with('table.id', [1])
             ->andReturnSelf();
         $table->shouldReceive('update')
             ->with(['searchable' => null]);
@@ -96,11 +97,7 @@ class PostgresEngineTest extends TestCase
         $table->shouldReceive('skip')->with($skip)->andReturnSelf()
             ->shouldReceive('limit')->with($limit)->andReturnSelf()
             ->shouldReceive('where')->with('bar', 1)->andReturnSelf()
-            ->shouldReceive('where')->with('baz', 'qux')
-            ->shouldReceive('getBindings')->andReturn([null, 'foo', 1, 'qux']);
-
-        $db->shouldReceive('select')
-            ->with(null, $table->getBindings());
+            ->shouldReceive('where')->with('baz', 'qux');
 
         $builder = new Builder(new TestModel(), 'foo');
         $builder->where('bar', 1)
@@ -117,11 +114,7 @@ class PostgresEngineTest extends TestCase
         $table = $this->setDbExpectations($db, false);
 
         $table->shouldReceive('orderBy')->with('bar', 'desc')->andReturnSelf()
-            ->shouldReceive('orderBy')->with('baz', 'asc')->andReturnSelf()
-            ->shouldReceive('getBindings')->andReturn([null, 'foo']);
-
-        $db->shouldReceive('select')
-            ->with(null, $table->getBindings());
+            ->shouldReceive('orderBy')->with('baz', 'asc')->andReturnSelf();
 
         $builder = new Builder(new TestModel(), 'foo');
         $builder->orderBy('bar', 'desc')
@@ -140,10 +133,7 @@ class PostgresEngineTest extends TestCase
 
         $table->shouldReceive('skip')->with($skip)->andReturnSelf()
             ->shouldReceive('limit')->with($limit)->andReturnSelf()
-            ->shouldReceive('where')->with('bar', 1)
-            ->shouldReceive('getBindings')->andReturn(['simple', 'foo', 1]);
-
-        $db->shouldReceive('select')->with(null, $table->getBindings());
+            ->shouldReceive('where')->with('bar', 1);
 
         $builder = new Builder(new TestModel(), 'foo');
         $builder->where('bar', 1)->take(5);
@@ -161,10 +151,7 @@ class PostgresEngineTest extends TestCase
 
         $table->shouldReceive('skip')->with($skip)->andReturnSelf()
             ->shouldReceive('limit')->with($limit)->andReturnSelf()
-            ->shouldReceive('where')->with('bar', 1)
-            ->shouldReceive('getBindings')->andReturn(['english', 'foo', 1]);
-
-        $db->shouldReceive('select')->with(null, $table->getBindings());
+            ->shouldReceive('where')->with('bar', 1);
 
         $model = new TestModel();
         $model->searchableOptions['config'] = 'english';
@@ -184,10 +171,7 @@ class PostgresEngineTest extends TestCase
         $table->shouldReceive('skip')->with(0)->andReturnSelf()
             ->shouldReceive('limit')->with(5)->andReturnSelf()
             ->shouldReceive('where')->with('bar', 1)->andReturnSelf()
-            ->shouldReceive('whereNull')->with('deleted_at')
-            ->shouldReceive('getBindings')->andReturn([null, 'foo', 1]);
-
-        $db->shouldReceive('select')->with(null, $table->getBindings());
+            ->shouldReceive('whereNull')->with('table.deleted_at');
 
         $builder = new Builder(new SoftDeletableTestModel(), 'foo');
         $builder->where('bar', 1)->take(5);
@@ -200,8 +184,9 @@ class PostgresEngineTest extends TestCase
         list($engine) = $this->getEngine();
 
         $model = Mockery::mock('StdClass');
+        $model->shouldReceive('getQualifiedKeyName')->andReturn('table.id');
         $model->shouldReceive('getKeyName')->andReturn('id');
-        $model->shouldReceive('whereIn')->once()->with('id', [1])->andReturn($model);
+        $model->shouldReceive('whereIn')->once()->with('table.id', [1])->andReturn($model);
         $model->shouldReceive('get')->once()->andReturn(Collection::make([new TestModel()]));
 
         $results = $engine->map(
@@ -218,8 +203,9 @@ class PostgresEngineTest extends TestCase
         list($engine) = $this->getEngine();
 
         $model = Mockery::mock('StdClass');
+        $model->shouldReceive('getQualifiedKeyName')->andReturn('table.id');
         $model->shouldReceive('getKeyName')->andReturn('id');
-        $model->shouldReceive('whereIn')->once()->with('id', [1, 2])->andReturn($model);
+        $model->shouldReceive('whereIn')->once()->with('table.id', [1, 2])->andReturn($model);
 
         $expectedModel = new SoftDeletableTestModel();
         $expectedModel->id = 2;
@@ -253,10 +239,6 @@ class PostgresEngineTest extends TestCase
 
         $table = $this->setDbExpectations($db);
         $table->shouldReceive('getBindings')->andReturn([null, 'foo']);
-
-        $db->shouldReceive('select')
-            ->andReturn(json_decode('[{"id": 1}, {"id": 2}]'));
-
         $builder = new Builder(new TestModel, 'foo');
         $results = $engine->search($builder);
         $ids = $engine->mapIds($results);
@@ -279,11 +261,12 @@ class PostgresEngineTest extends TestCase
     protected function setDbExpectations($db, $withDefaultOrderBy = true)
     {
         $db->shouldReceive('table')
-            ->andReturn($table = Mockery::mock('stdClass'));
+            ->andReturn($table = TestModel::query());
         $db->shouldReceive('raw')
             ->with('plainto_tsquery(COALESCE(?, get_current_ts_config()), ?) AS "tsquery"')
             ->andReturn('plainto_tsquery(COALESCE(?, get_current_ts_config()), ?) AS "tsquery"');
 
+        Model::unguard();
         $table->shouldReceive('crossJoin')
                 ->with('plainto_tsquery(COALESCE(?, get_current_ts_config()), ?) AS "tsquery"')
                 ->andReturnSelf()
@@ -291,7 +274,7 @@ class PostgresEngineTest extends TestCase
                 ->with(Mockery::type('array'), 'join')
                 ->andReturnSelf()
             ->shouldReceive('select')
-                ->with('id')
+                ->with('table.id')
                 ->andReturnSelf()
             ->shouldReceive('selectRaw')
                 ->with('ts_rank(searchable,"tsquery") AS rank')
@@ -300,27 +283,33 @@ class PostgresEngineTest extends TestCase
                 ->with('COUNT(*) OVER () AS total_count')
                 ->andReturnSelf()
             ->shouldReceive('whereRaw')
-                ->andReturnSelf();
+                ->andReturnSelf()
+            ->shouldReceive('get')
+                ->andReturn(Collection::make([
+                    new TestModel(['id' => 1]),
+                    new TestModel(['id' => 2]),
+                ]));
+        Model::reguard();
 
         if ($withDefaultOrderBy) {
             $table->shouldReceive('orderBy')
                     ->with('rank', 'desc')
                     ->andReturnSelf()
                 ->shouldReceive('orderBy')
-                    ->with('id')
+                    ->with('table.id')
                     ->andReturnSelf();
         }
 
-        $table->shouldReceive('toSql');
 
         return $table;
     }
 }
 
+
+$eloquentBuilder = Mockery::mock(EloquentBuilder::class)->makePartial();
+
 class TestModel extends Model
 {
-    public $id = 1;
-
     public $searchableOptions = [
         'rank' => [
             'fields' => [
@@ -341,14 +330,19 @@ class TestModel extends Model
         return 'searchable';
     }
 
+    public function getQualifiedKeyName()
+    {
+        return 'table.id';
+    }
+
     public function getKeyName()
     {
         return 'id';
     }
 
-    public function getKey()
+    public function getIdAttribute($value)
     {
-        return $this->id;
+        return $value ?: 1;
     }
 
     public function getTable()
@@ -369,6 +363,17 @@ class TestModel extends Model
     public function searchableAdditionalArray()
     {
         return $this->searchableAdditionalArray;
+    }
+
+    /**
+     * Begin querying the model.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public static function query()
+    {
+        global $eloquentBuilder;
+        return $eloquentBuilder;
     }
 }
 

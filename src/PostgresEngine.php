@@ -2,10 +2,12 @@
 
 namespace ScoutEngines\Postgres;
 
+use Closure;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as IlluminateCollection;
 use ScoutEngines\Postgres\TsQuery\ToTsQuery;
 use ScoutEngines\Postgres\TsQuery\PlainToTsQuery;
 use ScoutEngines\Postgres\TsQuery\PhraseToTsQuery;
@@ -38,6 +40,11 @@ class PostgresEngine extends Engine
      * @var \Illuminate\Database\Eloquent\Model
      */
     protected $model;
+
+    /**
+     * @var \Closure
+     */
+    protected $queryCallback;
 
     /**
      * Create a new instance of PostgresEngine.
@@ -82,7 +89,7 @@ class PostgresEngine extends Engine
 
         $query = $this->database
             ->table($model->searchableAs())
-            ->where($model->getKeyName(), '=', $model->getKey());
+            ->where($model->getQualifiedKeyName(), '=', $model->getKey());
 
         if (method_exists($model, 'searchableAdditionalArray')) {
             $data = $data->merge($model->searchableAdditionalArray() ?: []);
@@ -154,13 +161,14 @@ class PostgresEngine extends Engine
         }
 
         $indexColumn = $this->getIndexColumn($model);
+        $qualifiedKey = $model->getQualifiedKeyName();
         $key = $model->getKeyName();
 
         $ids = $models->pluck($key)->all();
 
         $this->database
             ->table($model->searchableAs())
-            ->whereIn($key, $ids)
+            ->whereIn($qualifiedKey, $ids)
             ->update([$indexColumn => null]);
     }
 
@@ -196,7 +204,9 @@ class PostgresEngine extends Engine
      */
     public function getTotalCount($results)
     {
-        if (empty($results)) {
+        if (empty($results) ||
+            ($results instanceof IlluminateCollection && $results->isEmpty())
+        ) {
             return 0;
         }
 
@@ -205,12 +215,23 @@ class PostgresEngine extends Engine
     }
 
     /**
+     * "Extend" the SQL search query.
+     *
+     * @param  \Closure  $callback
+     * @return void
+     */
+    public function extendQuery($callback = null)
+    {
+        $this->queryCallback = $callback;
+    }
+
+    /**
      * Perform the given search on the engine.
      *
-     * @param \Laravel\Scout\Builder $builder
-     * @param int|null $perPage
-     * @param int $page
-     * @return array
+     * @param  \Laravel\Scout\Builder $builder
+     * @param  int|null $perPage
+     * @param  int $page
+     * @return \Illuminate\Support\Collection|Illuminate\Database\Eloquent\Collection
      */
     protected function performSearch(Builder $builder, $perPage = 0, $page = 1)
     {
@@ -222,9 +243,8 @@ class PostgresEngine extends Engine
         $indexColumn = $this->getIndexColumn($builder->model);
 
         // Build the SQL query
-        $query = $this->database
-            ->table($builder->index ?: $builder->model->searchableAs())
-            ->select($builder->model->getKeyName())
+        $query = $builder->index ? $this->database->table($builder->index) : $builder->model->query();
+        $query->select($builder->model->getQualifiedKeyName())
             ->selectRaw("{$this->rankingExpression($builder->model, $indexColumn)} AS rank")
             ->selectRaw('COUNT(*) OVER () AS total_count')
             ->whereRaw("$indexColumn @@ \"tsquery\"");
@@ -238,19 +258,21 @@ class PostgresEngine extends Engine
         if (! $this->isExternalIndex($builder->model)) {
             // and the model uses soft deletes we need to exclude trashed rows
             if ($this->usesSoftDeletes($builder->model)) {
-                $query->whereNull($builder->model->getDeletedAtColumn());
+                $query->whereNull($builder->model->getQualifiedDeletedAtColumn());
             }
         }
 
         // Apply order by clauses that were set on the builder instance if any
         foreach ($builder->orders as $order) {
-            $query->orderBy($order['column'], $order['direction']);
+            if ($order['column']) {
+                $query->orderBy($order['column'], $order['direction']);
+            }
         }
 
         // Apply default order by clauses (rank and id)
         if (empty($builder->orders)) {
             $query->orderBy('rank', 'desc')
-                ->orderBy($builder->model->getKeyName());
+                ->orderBy($builder->model->getQualifiedKeyName());
         }
 
         if ($perPage > 0) {
@@ -270,8 +292,11 @@ class PostgresEngine extends Engine
         // Add TS bindings to the query
         $query->addBinding($tsQuery->bindings(), 'join');
 
-        return $this->database
-            ->select($query->toSql(), $query->getBindings());
+        if ($this->queryCallback instanceof Closure) {
+            $this->queryCallback->call($this, $query);
+        }
+
+        return $query->get();
     }
 
     /**
@@ -319,7 +344,9 @@ class PostgresEngine extends Engine
      */
     public function map(Builder $builder, $results, $model)
     {
-        if (empty($results)) {
+        if (empty($results) ||
+            ($results instanceof IlluminateCollection && $results->isEmpty())
+        ) {
             return Collection::make();
         }
 
@@ -327,7 +354,7 @@ class PostgresEngine extends Engine
 
         $results = collect($results);
 
-        $models = $model->whereIn($model->getKeyName(), $keys->all())
+        $models = $model->whereIn($model->getQualifiedKeyName(), $keys->all())
             ->get()
             ->keyBy($model->getKeyName());
 
